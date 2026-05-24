@@ -123,36 +123,25 @@ app.get('/exportar-csv/:id', async (req, res) => {
                 almacen, 
                 codigo, 
                 nombre, 
-                cantidad, 
+                SUM(cantidad) as cantidad, 
                 usuario, 
-                fecha 
+                MAX(fecha) as fecha 
             FROM inventario 
             WHERE id_corrida = $1
-            ORDER BY fecha DESC
+            GROUP BY almacen, codigo, nombre, usuario
+            ORDER BY almacen ASC, nombre ASC
         `, [id]);
         
-        // Definir encabezados claros
-        const header = "Almacen,Codigo,Nombre,Cantidad,Usuario,Fecha y Hora\n";
-        
-        // Construir las filas del CSV
+        const header = "Almacen,Codigo,Nombre,Cantidad Total,Usuario,Ultimo Registro\n";
         const rows = result.rows.map(r => {
-            // Formatear la fecha para que Excel la reconozca bien (YYYY-MM-DD HH:mm:ss)
             const fechaFormateada = r.fecha ? new Date(r.fecha).toISOString().replace(/T/, ' ').replace(/\..+/, '') : '---';
-            
             return `${r.almacen},${r.codigo},"${r.nombre.replace(/"/g, '""')}",${r.cantidad},${r.usuario},${fechaFormateada}`;
         }).join("\n");
 
-        // Configurar cabeceras de respuesta para descarga de archivo
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-        res.setHeader('Content-Disposition', `attachment; filename=inventario_toma_${id}.csv`);
-        
-        // Enviamos el BOM (Byte Order Mark) para que Excel reconozca tildes y caracteres especiales
+        res.setHeader('Content-Disposition', `attachment; filename=resumen_toma_${id}.csv`);
         res.status(200).send('\uFEFF' + header + rows);
-        
-    } catch (err) { 
-        console.error("Error en exportación:", err);
-        res.status(500).send("Error al generar el archivo de exportación"); 
-    }
+    } catch (err) { res.status(500).send("Error al generar reporte"); }
 });
 
 // --- 8. EXPORTAR DATOS ---
