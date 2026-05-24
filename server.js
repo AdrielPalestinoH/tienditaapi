@@ -144,6 +144,44 @@ app.get('/exportar-csv/:id', async (req, res) => {
     } catch (err) { res.status(500).send("Error al generar reporte"); }
 });
 
+
+// --- CRUD USUARIOS ---
+app.get('/usuarios-list', async (req, res) => {
+    const result = await pool.query('SELECT * FROM usuarios_app ORDER BY nombre ASC');
+    res.json(result.rows);
+});
+
+app.post('/usuarios-add', async (req, res) => {
+    const { nombre } = req.body;
+    await pool.query('INSERT INTO usuarios_app (nombre) VALUES ($1)', [nombre]);
+    res.json({ success: true });
+});
+
+app.post('/usuarios-delete', async (req, res) => {
+    const { id } = req.body;
+    await pool.query('DELETE FROM usuarios_app WHERE id = $1', [id]);
+    res.json({ success: true });
+});
+
+// --- CRUD ALMACENES ---
+app.get('/almacenes-list', async (req, res) => {
+    const result = await pool.query('SELECT * FROM almacenes_app ORDER BY nombre ASC');
+    res.json(result.rows);
+});
+
+app.post('/almacenes-add', async (req, res) => {
+    const { nombre } = req.body;
+    await pool.query('INSERT INTO almacenes_app (nombre) VALUES ($1)', [nombre]);
+    res.json({ success: true });
+});
+
+app.post('/almacenes-delete', async (req, res) => {
+    const { id } = req.body;
+    await pool.query('DELETE FROM almacenes_app WHERE id = $1', [id]);
+    res.json({ success: true });
+});
+
+
 // --- 8. EXPORTAR DATOS ---
 app.get('/exportar-final', async (req, res) => {
     try {
