@@ -160,13 +160,14 @@ app.get('/consultar-todo/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(`
-            SELECT usuario, almacen, codigo, nombre, cantidad 
+            SELECT usuario, almacen, codigo, nombre, cantidad, fecha 
             FROM inventario 
             WHERE id_corrida = $1
-        `, [id]); // Quitamos fecha_registro que es la que está rompiendo todo
+            ORDER BY fecha DESC
+        `, [id]);
         res.json(result.rows);
     } catch (err) { 
-        console.error(err); // Esto te dirá el error exacto en los logs de Azure
+        console.error(err);
         res.status(500).json({ error: err.message }); 
     }
 });
