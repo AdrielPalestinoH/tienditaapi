@@ -120,5 +120,11 @@ app.get('/exportar-final', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/consultar-todo', async (req, res) => {
+  // Tu lógica para leer la base de datos (SELECT * FROM Inventario)
+  const rows = await db.query("SELECT usuario, almacen, codigo, nombre, cantidad FROM capturas");
+  res.json(rows);
+});
+
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => console.log(`🚀 Postgres API lista en puerto ${PORT}`));
