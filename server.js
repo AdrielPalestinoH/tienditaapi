@@ -114,23 +114,45 @@ app.post('/borrar-captura', async (req, res) => {
 });
 
 
+// --- ENDPOINT DE EXPORTACIÓN CORREGIDO Y COMPLETO ---
 app.get('/exportar-csv/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(`
-            SELECT almacen, codigo, nombre, cantidad, usuario 
-            FROM inventario WHERE id_corrida = $1
+            SELECT 
+                almacen, 
+                codigo, 
+                nombre, 
+                cantidad, 
+                usuario, 
+                fecha 
+            FROM inventario 
+            WHERE id_corrida = $1
+            ORDER BY fecha DESC
         `, [id]);
         
-        const header = "Almacen,Codigo,Nombre,Cantidad,Usuario\n";
-        const rows = result.rows.map(r => 
-            `${r.almacen},${r.codigo},"${r.nombre}",${r.cantidad},${r.usuario}`
-        ).join("\n");
+        // Definir encabezados claros
+        const header = "Almacen,Codigo,Nombre,Cantidad,Usuario,Fecha y Hora\n";
+        
+        // Construir las filas del CSV
+        const rows = result.rows.map(r => {
+            // Formatear la fecha para que Excel la reconozca bien (YYYY-MM-DD HH:mm:ss)
+            const fechaFormateada = r.fecha ? new Date(r.fecha).toISOString().replace(/T/, ' ').replace(/\..+/, '') : '---';
+            
+            return `${r.almacen},${r.codigo},"${r.nombre.replace(/"/g, '""')}",${r.cantidad},${r.usuario},${fechaFormateada}`;
+        }).join("\n");
 
-        res.setHeader('Content-Type', 'text/csv');
+        // Configurar cabeceras de respuesta para descarga de archivo
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename=inventario_toma_${id}.csv`);
-        res.status(200).send(header + rows);
-    } catch (err) { res.status(500).send("Error al generar archivo"); }
+        
+        // Enviamos el BOM (Byte Order Mark) para que Excel reconozca tildes y caracteres especiales
+        res.status(200).send('\uFEFF' + header + rows);
+        
+    } catch (err) { 
+        console.error("Error en exportación:", err);
+        res.status(500).send("Error al generar el archivo de exportación"); 
+    }
 });
 
 // --- 8. EXPORTAR DATOS ---
