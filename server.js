@@ -182,14 +182,20 @@ app.get('/consultar-todo/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(`
-            SELECT usuario, almacen, codigo, nombre, cantidad, fecha 
+            SELECT 
+                usuario, 
+                almacen, 
+                codigo, 
+                nombre, 
+                SUM(cantidad) as cantidad, 
+                MAX(fecha) as fecha 
             FROM inventario 
             WHERE id_corrida = $1
+            GROUP BY usuario, almacen, codigo, nombre
             ORDER BY fecha DESC
         `, [id]);
         res.json(result.rows);
     } catch (err) { 
-        console.error(err);
         res.status(500).json({ error: err.message }); 
     }
 });
