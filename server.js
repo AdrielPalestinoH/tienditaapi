@@ -118,14 +118,13 @@ app.get('/exportar-csv/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(`
-            SELECT almacen, codigo, nombre, cantidad, usuario, fecha_registro 
+            SELECT almacen, codigo, nombre, cantidad, usuario 
             FROM inventario WHERE id_corrida = $1
         `, [id]);
         
-        // Generamos un CSV básico
-        const header = "Almacen,Codigo,Nombre,Cantidad,Usuario,Fecha\n";
+        const header = "Almacen,Codigo,Nombre,Cantidad,Usuario\n";
         const rows = result.rows.map(r => 
-            `${r.almacen},${r.codigo},"${r.nombre}",${r.cantidad},${r.usuario},${r.fecha_registro}`
+            `${r.almacen},${r.codigo},"${r.nombre}",${r.cantidad},${r.usuario}`
         ).join("\n");
 
         res.setHeader('Content-Type', 'text/csv');
@@ -161,14 +160,15 @@ app.get('/consultar-todo/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(`
-            SELECT usuario, almacen, codigo, nombre, cantidad, fecha_registro 
+            SELECT usuario, almacen, codigo, nombre, cantidad 
             FROM inventario 
             WHERE id_corrida = $1
-            ORDER BY fecha_registro DESC
-        `, [id]);
+        `, [id]); // Quitamos fecha_registro que es la que está rompiendo todo
         res.json(result.rows);
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { 
+        console.error(err); // Esto te dirá el error exacto en los logs de Azure
+        res.status(500).json({ error: err.message }); 
+    }
 });
-
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => console.log(`🚀 Postgres API lista en puerto ${PORT}`));
