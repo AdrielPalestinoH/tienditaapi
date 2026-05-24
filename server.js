@@ -115,6 +115,7 @@ app.post('/borrar-captura', async (req, res) => {
 
 
 // --- ENDPOINT DE EXPORTACIÓN CORREGIDO Y COMPLETO ---
+// --- ENDPOINT DE EXPORTACIÓN CORREGIDO (AGRUPADO POR ALMACÉN Y SUMA USUARIOS) ---
 app.get('/exportar-csv/:id', async (req, res) => {
     try {
         const { id } = req.params;
@@ -123,25 +124,40 @@ app.get('/exportar-csv/:id', async (req, res) => {
                 almacen, 
                 codigo, 
                 nombre, 
-                SUM(cantidad) as cantidad, 
-                usuario, 
-                MAX(fecha) as fecha 
+                SUM(cantidad) as cantidad_total, 
+                STRING_AGG(DISTINCT usuario, ', ') as usuarios_lista, 
+                MAX(fecha) as fecha_final
             FROM inventario 
             WHERE id_corrida = $1
-            GROUP BY almacen, codigo, nombre, usuario
+            GROUP BY almacen, codigo, nombre
             ORDER BY almacen ASC, nombre ASC
         `, [id]);
         
-        const header = "Almacen,Codigo,Nombre,Cantidad Total,Usuario,Ultimo Registro\n";
+        // El header del CSV
+        const header = "Almacen,Codigo,Nombre,Cantidad Total,Usuarios,Ultimo Registro\n";
+        
         const rows = result.rows.map(r => {
-            const fechaFormateada = r.fecha ? new Date(r.fecha).toISOString().replace(/T/, ' ').replace(/\..+/, '') : '---';
-            return `${r.almacen},${r.codigo},"${r.nombre.replace(/"/g, '""')}",${r.cantidad},${r.usuario},${fechaFormateada}`;
+            const fechaFormateada = r.fecha_final ? new Date(r.fecha_final).toISOString().replace(/T/, ' ').replace(/\..+/, '') : '---';
+            
+            // EL TRUCO PARA EL CÓDIGO: 
+            // En CSV, para que Excel no lo convierta a +E12, se pone entre comillas y con un igual delante: ="CODIGO"
+            const codigoExcel = `="${r.codigo}"`;
+            
+            // Limpiamos el nombre de comas para no romper las columnas del CSV
+            const nombreLimpio = r.nombre.replace(/"/g, '""');
+            
+            return `${r.almacen},${codigoExcel},"${nombreLimpio}",${r.cantidad_total},"${r.usuarios_lista}",${fechaFormateada}`;
         }).join("\n");
 
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename=resumen_toma_${id}.csv`);
+        
+        // \uFEFF es para que Excel detecte los acentos correctamente (UTF-8 con BOM)
         res.status(200).send('\uFEFF' + header + rows);
-    } catch (err) { res.status(500).send("Error al generar reporte"); }
+    } catch (err) { 
+        console.error(err);
+        res.status(500).send("Error al generar reporte"); 
+    }
 });
 
 
