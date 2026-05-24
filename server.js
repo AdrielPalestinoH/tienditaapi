@@ -121,43 +121,35 @@ app.get('/exportar-csv/:id', async (req, res) => {
         const { id } = req.params;
         const result = await pool.query(`
             SELECT 
-                almacen, 
-                codigo, 
-                nombre, 
-                SUM(cantidad) as cantidad_total, 
-                STRING_AGG(DISTINCT usuario, ', ') as usuarios_lista, 
-                MAX(fecha) as fecha_final
-            FROM inventario 
-            WHERE id_corrida = $1
-            GROUP BY almacen, codigo, nombre
-            ORDER BY almacen ASC, nombre ASC
+                i.almacen, 
+                i.codigo, 
+                i.nombre, 
+                SUM(i.cantidad) as cantidad_total, 
+                STRING_AGG(DISTINCT i.usuario, ', ') as usuarios_lista, 
+                MAX(i.fecha) as fecha_final,
+                -- Si no existe en la tabla productos, es un NUEVO
+                CASE WHEN p.codigo IS NULL THEN 'SÍ' ELSE 'NO' END as es_nuevo
+            FROM inventario i
+            LEFT JOIN productos p ON i.codigo = p.codigo
+            WHERE i.id_corrida = $1
+            GROUP BY i.almacen, i.codigo, i.nombre, p.codigo
+            ORDER BY es_nuevo ASC, i.almacen ASC, i.nombre ASC
         `, [id]);
         
-        // El header del CSV
-        const header = "Almacen,Codigo,Nombre,Cantidad Total,Usuarios,Ultimo Registro\n";
+        const header = "Almacen,Codigo,Nombre,Cantidad Total,Usuarios,Ultimo Registro,Nuevo en Sistema\n";
         
         const rows = result.rows.map(r => {
             const fechaFormateada = r.fecha_final ? new Date(r.fecha_final).toISOString().replace(/T/, ' ').replace(/\..+/, '') : '---';
-            
-            // EL TRUCO PARA EL CÓDIGO: 
-            // En CSV, para que Excel no lo convierta a +E12, se pone entre comillas y con un igual delante: ="CODIGO"
-            const codigoExcel = `="${r.codigo}"`;
-            
-            // Limpiamos el nombre de comas para no romper las columnas del CSV
-            const nombreLimpio = r.nombre.replace(/"/g, '""');
-            
-            return `${r.almacen},${codigoExcel},"${nombreLimpio}",${r.cantidad_total},"${r.usuarios_lista}",${fechaFormateada}`;
+            const codigoExcel = `="${r.codigo}"`; // Evita el +E12
+            const nombreFinal = r.es_nuevo === 'SÍ' ? `[ALTA POS] ${r.nombre}` : r.nombre;
+
+            return `${r.almacen},${codigoExcel},"${nombreFinal.replace(/"/g, '""')}",${r.cantidad_total},"${r.usuarios_lista}",${fechaFormateada},${r.es_nuevo}`;
         }).join("\n");
 
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-        res.setHeader('Content-Disposition', `attachment; filename=resumen_toma_${id}.csv`);
-        
-        // \uFEFF es para que Excel detecte los acentos correctamente (UTF-8 con BOM)
+        res.setHeader('Content-Disposition', `attachment; filename=inventario_gdl_${id}.csv`);
         res.status(200).send('\uFEFF' + header + rows);
-    } catch (err) { 
-        console.error(err);
-        res.status(500).send("Error al generar reporte"); 
-    }
+    } catch (err) { res.status(500).send("Error al generar reporte"); }
 });
 
 
