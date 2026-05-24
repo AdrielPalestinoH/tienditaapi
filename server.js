@@ -113,6 +113,27 @@ app.post('/borrar-captura', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+
+app.get('/exportar-csv/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(`
+            SELECT almacen, codigo, nombre, cantidad, usuario, fecha_registro 
+            FROM inventario WHERE id_corrida = $1
+        `, [id]);
+        
+        // Generamos un CSV básico
+        const header = "Almacen,Codigo,Nombre,Cantidad,Usuario,Fecha\n";
+        const rows = result.rows.map(r => 
+            `${r.almacen},${r.codigo},"${r.nombre}",${r.cantidad},${r.usuario},${r.fecha_registro}`
+        ).join("\n");
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename=inventario_toma_${id}.csv`);
+        res.status(200).send(header + rows);
+    } catch (err) { res.status(500).send("Error al generar archivo"); }
+});
+
 // --- 8. EXPORTAR DATOS ---
 app.get('/exportar-final', async (req, res) => {
     try {
@@ -126,18 +147,27 @@ app.get('/exportar-final', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/consultar-todo', async (req, res) => {
+
+
+app.get('/corridas', async (req, res) => {
     try {
-        // Usamos pool (que es tu conexión arriba) y la tabla correcta
-        const result = await pool.query(`
-            SELECT usuario, almacen, codigo, nombre, cantidad 
-            FROM inventario 
-            WHERE id_corrida = (SELECT id FROM corridas WHERE activa = TRUE ORDER BY id DESC LIMIT 1)
-        `);
+        const result = await pool.query('SELECT id, fecha_inicio, activa FROM corridas ORDER BY id DESC');
         res.json(result.rows);
-    } catch (err) { 
-        res.status(500).json({ error: err.message }); 
-    }
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- MODIFICADO: CONSULTAR TODO DE UNA CORRIDA ESPECÍFICA ---
+app.get('/consultar-todo/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(`
+            SELECT usuario, almacen, codigo, nombre, cantidad, fecha_registro 
+            FROM inventario 
+            WHERE id_corrida = $1
+            ORDER BY fecha_registro DESC
+        `, [id]);
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 const PORT = process.env.PORT || 8080;
