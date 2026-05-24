@@ -10,6 +10,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
 app.use(express.json());
 
 // Configuración de conexión a Azure Postgres
@@ -126,9 +127,17 @@ app.get('/exportar-final', async (req, res) => {
 });
 
 app.get('/consultar-todo', async (req, res) => {
-  // Tu lógica para leer la base de datos (SELECT * FROM Inventario)
-  const rows = await db.query("SELECT usuario, almacen, codigo, nombre, cantidad FROM capturas");
-  res.json(rows);
+    try {
+        // Usamos pool (que es tu conexión arriba) y la tabla correcta
+        const result = await pool.query(`
+            SELECT usuario, almacen, codigo, nombre, cantidad 
+            FROM inventario 
+            WHERE id_corrida = (SELECT id FROM corridas WHERE activa = TRUE ORDER BY id DESC LIMIT 1)
+        `);
+        res.json(result.rows);
+    } catch (err) { 
+        res.status(500).json({ error: err.message }); 
+    }
 });
 
 const PORT = process.env.PORT || 8080;
